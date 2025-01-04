@@ -20,8 +20,13 @@ vial-kb#79
 
 Vial is an open-source cross-platform (Windows, Linux and Mac) GUI and a QMK fork for configuring your keyboard in real time.
 
+*NeoVial*
 
-![](https://get.vial.today/img/vial-win-1.png)
+![NeoVial](https://github.com/user-attachments/assets/f9d8e947-442a-49a7-b098-30ffff784352)
+
+*Vial*
+
+![Vial](https://get.vial.today/img/vial-win-1.png)
 
 
 ---
@@ -29,7 +34,8 @@ Vial is an open-source cross-platform (Windows, Linux and Mac) GUI and a QMK for
 
 #### Releases
 
-Visit https://get.vial.today/ to download a binary release of Vial.
+Check releases section in here for NeoVial 0.7.2 (patched Vial 0.7.1),
+Or visit https://get.vial.today/ to download a binary release of Vial.
 
 #### Development
 
