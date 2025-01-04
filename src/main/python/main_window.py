@@ -27,7 +27,7 @@ from editor.rgb_configurator import RGBConfigurator
 from tabbed_keycodes import TabbedKeycodes
 from editor.tap_dance import TapDance
 from unlocker import Unlocker
-from util import tr, EXAMPLE_KEYBOARDS, KeycodeDisplay
+from util import tr, EXAMPLE_KEYBOARDS, KeycodeDisplay, EXAMPLE_KEYBOARD_PREFIX
 from vial_device import VialKeyboard
 from editor.matrix_test import MatrixTest
 
@@ -147,6 +147,10 @@ class MainWindow(QMainWindow):
         layout_save_act.setShortcut("Ctrl+S")
         layout_save_act.triggered.connect(self.on_layout_save)
 
+        layout_export_svg = QAction(tr("MenuFile", "Export layout as svg..."), self)
+        layout_export_svg.setShortcut("Ctrl+I")
+        layout_export_svg.triggered.connect(self.on_layout_export_svg)
+
         sideload_json_act = QAction(tr("MenuFile", "Sideload VIA JSON..."), self)
         sideload_json_act.triggered.connect(self.on_sideload_json)
 
@@ -164,6 +168,7 @@ class MainWindow(QMainWindow):
             file_menu = self.menuBar().addMenu(tr("Menu", "File"))
             file_menu.addAction(layout_load_act)
             file_menu.addAction(layout_save_act)
+            file_menu.addAction(layout_export_svg)
             file_menu.addSeparator()
             file_menu.addAction(sideload_json_act)
             file_menu.addAction(download_via_stack_act)
@@ -172,12 +177,15 @@ class MainWindow(QMainWindow):
             file_menu.addAction(exit_act)
 
         keyboard_unlock_act = QAction(tr("MenuSecurity", "Unlock"), self)
+        keyboard_unlock_act.setShortcut("Ctrl+U")
         keyboard_unlock_act.triggered.connect(self.unlock_keyboard)
 
         keyboard_lock_act = QAction(tr("MenuSecurity", "Lock"), self)
+        keyboard_lock_act.setShortcut("Ctrl+L")
         keyboard_lock_act.triggered.connect(self.lock_keyboard)
 
         keyboard_reset_act = QAction(tr("MenuSecurity", "Reboot to bootloader"), self)
+        keyboard_reset_act.setShortcut("Ctrl+B")
         keyboard_reset_act.triggered.connect(self.reboot_to_bootloader)
 
         keyboard_layout_menu = self.menuBar().addMenu(tr("Menu", "Keyboard layout"))
@@ -245,6 +253,14 @@ class MainWindow(QMainWindow):
             with open(dialog.selectedFiles()[0], "wb") as outf:
                 outf.write(self.keymap_editor.save_layout())
 
+    def on_layout_export_svg(self):
+        dialog = QFileDialog()
+        dialog.setDefaultSuffix("svg")
+        dialog.setAcceptMode(QFileDialog.AcceptSave)
+        dialog.setNameFilters(["Keymap image (*.svg)"])
+        if dialog.exec_() == QDialog.Accepted:
+            self.keymap_editor.export_as_svg(dialog.selectedFiles()[0])
+
     def on_click_refresh(self):
         self.autorefresh.update(quiet=False, hard=True)
 
@@ -276,10 +292,11 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "", "Unsupported protocol version!\n"
                                           "Please download latest Vial from https://get.vial.today/")
 
-        if isinstance(self.autorefresh.current_device, VialKeyboard) \
-                and self.autorefresh.current_device.keyboard.keyboard_id in EXAMPLE_KEYBOARDS:
-            QMessageBox.warning(self, "", "An example keyboard UID was detected.\n"
-                                          "Please change your keyboard UID to be unique before you ship!")
+        if isinstance(self.autorefresh.current_device, VialKeyboard):
+            keyboard_id = self.autorefresh.current_device.keyboard.keyboard_id
+            if (keyboard_id in EXAMPLE_KEYBOARDS) or ((keyboard_id & 0xFFFFFFFFFFFFFF) == EXAMPLE_KEYBOARD_PREFIX):
+                QMessageBox.warning(self, "", "An example keyboard UID was detected.\n"
+                                              "Please change your keyboard UID to be unique before you ship!")
 
         self.rebuild()
         self.refresh_tabs()
