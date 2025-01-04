@@ -19,6 +19,8 @@ Visit https://get.vial.today/ to download a binary release of Vial.
 
 #### Development
 
+Python 3.12 is recommended.
+
 Install dependencies:
 
 ```
@@ -31,5 +33,6 @@ To launch the application afterwards:
 
 ```
 source venv/bin/activate
-./vial-gui
+pyinstaller misc/Vial.spec
+./dist/Vial/Vial
 ```
