@@ -1,4 +1,18 @@
-### vial-gui
+### neovial-gui
+
+Based on Vial 0.7.1 with select applied pending requests.
+Bumped version to 0.7.2 and called it NeoVial for my own usage and fun.
+
+- Compiled using Python 3.12.8 + pyinstaller (instead of fbs).
+- Export layout to SVG format.
+- Tool-tip over Tap Dance and Macros.
+- All thanks to the following PR's and couple of tweaks to make it work:
+
+vial-kb#79
+| vial-kb#120
+| vial-kb#132
+| vial-kb#214
+| vial-kb#238
 
 # Docs and getting started
 
