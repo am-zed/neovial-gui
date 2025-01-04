@@ -8,17 +8,17 @@ from constants import KEYCODE_BTN_RATIO
 from widgets.display_keyboard import DisplayKeyboard
 from widgets.display_keyboard_defs import ansi_100, ansi_80, ansi_70, iso_100, iso_80, iso_70, mods, mods_narrow
 from widgets.flowlayout import FlowLayout
-from keycodes import KEYCODES_BASIC, KEYCODES_ISO, KEYCODES_MACRO, KEYCODES_LAYERS, KEYCODES_QUANTUM, \
+from keycodes.keycodes import KEYCODES_BASIC, KEYCODES_ISO, KEYCODES_MACRO, KEYCODES_LAYERS, KEYCODES_QUANTUM, \
     KEYCODES_BOOT, KEYCODES_MODIFIERS, \
     KEYCODES_BACKLIGHT, KEYCODES_MEDIA, KEYCODES_SPECIAL, KEYCODES_SHIFTED, KEYCODES_USER, Keycode, \
     KEYCODES_TAP_DANCE, KEYCODES_MIDI, KEYCODES_BASIC_NUMPAD, KEYCODES_BASIC_NAV, KEYCODES_ISO_KR
 from widgets.square_button import SquareButton
 from util import tr, KeycodeDisplay
-
+import re
 
 class AlternativeDisplay(QWidget):
 
-    keycode_changed = pyqtSignal(int)
+    keycode_changed = pyqtSignal(str)
 
     def __init__(self, kbdef, keycodes, prefix_buttons):
         super().__init__()
@@ -34,7 +34,7 @@ class AlternativeDisplay(QWidget):
                 btn = SquareButton()
                 btn.setRelSize(KEYCODE_BTN_RATIO)
                 btn.setText(title)
-                btn.clicked.connect(lambda st, k=code: self.keycode_changed.emit(k))
+                btn.clicked.connect(lambda st, k=code: self.keycode_changed.emit(title))
                 self.key_layout.addWidget(btn)
 
         layout = QVBoxLayout()
@@ -46,18 +46,47 @@ class AlternativeDisplay(QWidget):
         layout.addLayout(self.key_layout)
         self.setLayout(layout)
 
-    def recreate_buttons(self, keycode_filter):
+    def recreate_buttons(self, keycode_filter, keyboard=None):
         for btn in self.buttons:
             btn.deleteLater()
         self.buttons = []
 
         for keycode in self.keycodes:
-            if not keycode_filter(keycode.code):
+            if not keycode_filter(keycode.qmk_id):
                 continue
             btn = SquareButton()
             btn.setRelSize(KEYCODE_BTN_RATIO)
-            btn.setToolTip(Keycode.tooltip(keycode.code))
-            btn.clicked.connect(lambda st, k=keycode: self.keycode_changed.emit(k.code))
+            tooltip = Keycode.tooltip(keycode.qmk_id)
+            # tool tip for tap_dance and macro
+            if keyboard != None and re.search(r"TD\((\d+)\)", keycode.qmk_id):
+                tooltip_ = ''
+                tap_dance_idx = int(re.search(r"TD\((\d+)\)", keycode.qmk_id).group(1))
+                prefix = ['On Tap: ', 'On hold: ', 'On double tap: ', 'On tap + hold: ', 'Tapping term(ms): ']
+                for i in range(len(keyboard.tap_dance_entries[tap_dance_idx])):
+                    tooltip_ = tooltip_ + (prefix[i]) + str(keyboard.tap_dance_entries[tap_dance_idx][i])
+                    if i != len(keyboard.tap_dance_entries[tap_dance_idx]) - 1:
+                        tooltip_ = tooltip_ + '\n'
+                tooltip = tooltip_
+            elif keyboard != None and re.search(r"M(\d+)", keycode.qmk_id):
+                macro_idx = int(re.search(r"M(\d+)", keycode.qmk_id).group(1))
+                macro = keyboard.macros_deserialize(keyboard.macro)[macro_idx]
+                tooltip_ = ''
+                for act in macro:
+                    tooltip_ = tooltip_ + act.tag + ': '
+                    if act.tag == 'text':
+                        tooltip_ = tooltip_ + act.text
+                    elif act.tag == 'delay':
+                        tooltip_ = tooltip_ + str(act.delay)
+                    else:
+                        for s in act.sequence:
+                            tooltip_ = tooltip_ + s + ' + '
+                        tooltip_ = tooltip_[:-3]
+                    if macro.index(act) != len(macro) - 1:
+                        tooltip_ = tooltip_ + '\n'
+                tooltip = tooltip_
+            #btn.setToolTip(Keycode.tooltip(keycode.qmk_id))
+            btn.setToolTip(tooltip)
+            btn.clicked.connect(lambda st, k=keycode: self.keycode_changed.emit(k.qmk_id))
             btn.keycode = keycode
             self.key_layout.addWidget(btn)
             self.buttons.append(btn)
@@ -79,7 +108,7 @@ class AlternativeDisplay(QWidget):
 
 class Tab(QScrollArea):
 
-    keycode_changed = pyqtSignal(int)
+    keycode_changed = pyqtSignal(str)
 
     def __init__(self, parent, label, alts, prefix_buttons=None):
         super().__init__(parent)
@@ -103,9 +132,9 @@ class Tab(QScrollArea):
         w.setLayout(self.layout)
         self.setWidget(w)
 
-    def recreate_buttons(self, keycode_filter):
+    def recreate_buttons(self, keycode_filter, keyboard=None):
         for alt in self.alternatives:
-            alt.recreate_buttons(keycode_filter)
+            alt.recreate_buttons(keycode_filter, keyboard)
         self.setVisible(self.has_buttons())
 
     def relabel_buttons(self):
@@ -145,12 +174,12 @@ def keycode_filter_any(kc):
 
 
 def keycode_filter_masked(kc):
-    return kc < 256
+    return Keycode.is_basic(kc)
 
 
 class FilteredTabbedKeycodes(QTabWidget):
 
-    keycode_changed = pyqtSignal(int)
+    keycode_changed = pyqtSignal(str)
     anykey = pyqtSignal()
 
     def __init__(self, parent=None, keycode_filter=keycode_filter_any):
@@ -191,18 +220,18 @@ class FilteredTabbedKeycodes(QTabWidget):
         KeycodeDisplay.notify_keymap_override(self)
 
     def on_keycode_changed(self, code):
-        if code == -1:
+        if code == "Any":
             self.anykey.emit()
         else:
-            self.keycode_changed.emit(code)
+            self.keycode_changed.emit(Keycode.normalize(code))
 
-    def recreate_keycode_buttons(self):
+    def recreate_keycode_buttons(self, keyboard=None):
         prev_tab = self.tabText(self.currentIndex()) if self.currentIndex() >= 0 else ""
         while self.count() > 0:
             self.removeTab(0)
 
         for tab in self.tabs:
-            tab.recreate_buttons(self.keycode_filter)
+            tab.recreate_buttons(self.keycode_filter, keyboard)
             if tab.has_buttons():
                 self.addTab(tab, tr("TabbedKeycodes", tab.label))
                 if tab.label == prev_tab:
@@ -215,7 +244,7 @@ class FilteredTabbedKeycodes(QTabWidget):
 
 class TabbedKeycodes(QWidget):
 
-    keycode_changed = pyqtSignal(int)
+    keycode_changed = pyqtSignal(str)
     anykey = pyqtSignal()
 
     def __init__(self):
@@ -241,8 +270,10 @@ class TabbedKeycodes(QWidget):
         cls.tray = tray
 
     @classmethod
-    def open_tray(cls, target, keycode_filter=None):
+    def open_tray(cls, target, keycode_filter=None, keyboard=None):
         cls.tray.set_keycode_filter(keycode_filter)
+        if keyboard != None:
+            cls.tray.recreate_keycode_buttons(keyboard)
         cls.tray.show()
         if cls.tray.target is not None and cls.tray.target != target:
             cls.tray.target.deselect()
@@ -270,9 +301,9 @@ class TabbedKeycodes(QWidget):
         if self.target is not None:
             self.target.on_anykey()
 
-    def recreate_keycode_buttons(self):
+    def recreate_keycode_buttons(self, keyboard=None):
         for opt in [self.all_keycodes, self.basic_keycodes]:
-            opt.recreate_keycode_buttons()
+            opt.recreate_keycode_buttons(keyboard)
 
     def set_keycode_filter(self, keycode_filter):
         if keycode_filter == keycode_filter_masked:

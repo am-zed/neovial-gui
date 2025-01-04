@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 import logging
 import os
+import pathlib
 import sys
 import time
+import re
 from logging.handlers import RotatingFileHandler
 
 from PyQt5.QtCore import QCoreApplication, QStandardPaths
@@ -10,7 +12,7 @@ from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import QApplication, QWidget, QScrollArea, QFrame
 
 from hidproxy import hid
-from keycodes import Keycode
+from keycodes.keycodes import Keycode
 from keymaps import KEYMAPS
 
 tr = QCoreApplication.translate
@@ -146,8 +148,7 @@ def pad_for_vibl(msg):
 def init_logger():
     logging.basicConfig(level=logging.INFO)
     directory = QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation)
-    if not os.path.exists(directory):
-        os.mkdir(directory)
+    pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
     path = os.path.join(directory, "vial.log")
     handler = RotatingFileHandler(path, maxBytes=5 * 1024 * 1024, backupCount=5)
     handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(module)s:%(lineno)d - %(message)s"))
@@ -186,11 +187,41 @@ class KeycodeDisplay:
         return key is not None and key.qmk_id in cls.keymap_override
 
     @classmethod
-    def display_keycode(cls, widget, code):
+    def display_keycode(cls, widget, code, keyboard=None):
         text = cls.get_label(code)
         tooltip = Keycode.tooltip(code)
+        # tool tip for tap_dance
+        if re.search(r"TD\((\d+)\)", code) and keyboard != None:
+            tooltip_ = ''
+            tap_dance_idx = int(re.search(r"TD\((\d+)\)", code).group(1))
+            prefix = ['On Tap: ', 'On hold: ', 'On double tap: ', 'On tap + hold: ', 'Tapping term(ms): ']
+            for i in range(len(keyboard.tap_dance_entries[tap_dance_idx])):
+                tooltip_ = tooltip_ + (prefix[i]) + str(keyboard.tap_dance_entries[tap_dance_idx][i])
+                if i != len(keyboard.tap_dance_entries[tap_dance_idx]) - 1:
+                    tooltip_ = tooltip_ + '\n'
+            tooltip = tooltip_
+        elif re.search(r"M(\d+)", code) and keyboard != None:
+            macro_idx = int(re.search(r"M(\d+)", code).group(1))
+            macro = keyboard.macros_deserialize(keyboard.macro)[macro_idx]
+            tooltip_ = ''
+            for act in macro:
+                tooltip_ = tooltip_ + act.tag + ': '
+                if act.tag == 'text':
+                    tooltip_ = tooltip_ + act.text
+                elif act.tag == 'delay':
+                    tooltip_ = tooltip_ + str(act.delay)
+                else:
+                    for s in act.sequence:
+                        tooltip_ = tooltip_ + s + ' + '
+                    tooltip_ = tooltip_[:-3]
+                if macro.index(act) != len(macro) - 1:
+                    tooltip_ = tooltip_ + '\n'
+            tooltip = tooltip_
         mask = Keycode.is_mask(code)
-        mask_text = cls.get_label(code & 0xFF)
+        mask_text = ""
+        inner = Keycode.find_inner_keycode(code)
+        if inner:
+            mask_text = cls.get_label(inner.qmk_id)
         if mask:
             text = text.split("\n")[0]
         widget.masked = mask
@@ -201,7 +232,7 @@ class KeycodeDisplay:
             widget.setColor(QApplication.palette().color(QPalette.Link))
         else:
             widget.setColor(None)
-        if mask and cls.code_is_overriden(code & 0xFF):
+        if inner and mask and cls.code_is_overriden(inner.qmk_id):
             widget.setMaskColor(QApplication.palette().color(QPalette.Link))
         else:
             widget.setMaskColor(None)
