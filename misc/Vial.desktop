@@ -1,7 +1,7 @@
 [Desktop Entry]
-Name=Vial
+Name=NeoVial
 Type=Application
-Exec=Vial
+Exec=NeoVial
 Terminal=false
 NoDisplay=false
 Categories=Utility;

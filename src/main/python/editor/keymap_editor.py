@@ -153,7 +153,7 @@ class KeymapEditor(BasicEditor):
         generator.setViewBox(QRect(0, 0, widget.width, widget.height * self.keyboard.layers))
         generator.setFileName(filename)
         generator.setTitle("My Keymap")
-        generator.setDescription("Keymap generated from Vial")
+        generator.setDescription("Keymap generated from NeoVial")
         painter = QPainter()
         painter.begin(generator)
         current_layer = self.current_layer
