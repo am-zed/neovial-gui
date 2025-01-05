@@ -54,5 +54,5 @@ To launch the application afterwards:
 ```
 source venv/bin/activate
 pyinstaller misc/Vial.spec
-./dist/Vial/Vial
+./dist/NeoVial/NeoVial
 ```
